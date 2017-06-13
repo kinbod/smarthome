@@ -29,9 +29,10 @@ import com.google.common.collect.Sets;
  * @author Gerhard Riegler - Initial contribution
  */
 public class AstroHandlerFactory extends BaseThingHandlerFactory {
-    public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES = Sets.union(SunHandler.SUPPORTED_THING_TYPES,
+
+    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES = Sets.union(SunHandler.SUPPORTED_THING_TYPES,
             MoonHandler.SUPPORTED_THING_TYPES);
-    private static final Map<String, AstroThingHandler> astroThingHandlers = new HashMap<String, AstroThingHandler>();
+    private static final Map<String, AstroThingHandler> astroThingHandlers = new HashMap<>();
 
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
@@ -41,8 +42,8 @@ public class AstroHandlerFactory extends BaseThingHandlerFactory {
     @Override
     protected ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
-
         AstroThingHandler thingHandler = null;
+
         if (thingTypeUID.equals(THING_TYPE_SUN)) {
             thingHandler = new SunHandler(thing);
         } else if (thingTypeUID.equals(THING_TYPE_MOON)) {

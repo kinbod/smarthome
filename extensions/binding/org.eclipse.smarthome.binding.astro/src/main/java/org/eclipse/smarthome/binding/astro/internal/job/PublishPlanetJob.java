@@ -7,23 +7,38 @@
  */
 package org.eclipse.smarthome.binding.astro.internal.job;
 
+import static org.eclipse.smarthome.binding.astro.internal.job.Job.checkNull;
+
 import org.eclipse.smarthome.binding.astro.handler.AstroThingHandler;
 import org.eclipse.smarthome.binding.astro.internal.AstroHandlerFactory;
-import org.quartz.JobDataMap;
 
 /**
- * Simple job that publishes the daily info for a planet.
+ * Scheduled job for planets
  *
  * @author Gerhard Riegler - Initial contribution
+ * @author Amit Kumar Mondal - Implementation to be compliant with ESH Scheduler
  */
-public class PublishPlanetJob extends AbstractBaseJob {
+public final class PublishPlanetJob extends AbstractJob {
+
+    /**
+     * Constructor
+     *
+     * @param thingUID thing UID
+     * @throws IllegalArgumentException
+     *             if the provided argument is {@code null}
+     */
+    public PublishPlanetJob(String thingUID) {
+        checkArgument(thingUID != null, "Thing UID cannot be null");
+        this.thingUID = thingUID;
+    }
 
     @Override
-    protected void executeJob(String thingUid, JobDataMap jobDataMap) {
-        AstroThingHandler astroHandler = AstroHandlerFactory.getHandler(thingUid);
-        if (astroHandler != null) {
-            astroHandler.publishDailyInfo();
+    public void run() {
+        AstroThingHandler astroHandler = AstroHandlerFactory.getHandler(thingUID);
+        if (checkNull(astroHandler, "AstroThingHandler is null")) {
+            return;
         }
+        astroHandler.publishDailyInfo();
     }
 
 }

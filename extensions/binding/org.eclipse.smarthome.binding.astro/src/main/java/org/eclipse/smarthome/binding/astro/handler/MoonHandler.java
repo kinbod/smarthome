@@ -9,44 +9,48 @@ package org.eclipse.smarthome.binding.astro.handler;
 
 import static org.eclipse.smarthome.binding.astro.AstroBindingConstants.THING_TYPE_MOON;
 
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.smarthome.binding.astro.internal.calc.MoonCalc;
-import org.eclipse.smarthome.binding.astro.internal.job.AbstractDailyJob;
 import org.eclipse.smarthome.binding.astro.internal.job.DailyJobMoon;
+import org.eclipse.smarthome.binding.astro.internal.job.Job;
 import org.eclipse.smarthome.binding.astro.internal.model.Moon;
 import org.eclipse.smarthome.binding.astro.internal.model.Planet;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 
-import com.google.common.collect.Sets;
-
 /**
  * The MoonHandler is responsible for updating calculated moon data.
  *
  * @author Gerhard Riegler - Initial contribution
+ * @author Amit Kumar Mondal - Implementation to be compliant with ESH Scheduler
  */
 public class MoonHandler extends AstroThingHandler {
-    public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES = Sets.newHashSet(THING_TYPE_MOON);
 
-    private String[] positionalChannelIds = new String[] { "phase#name", "phase#age", "phase#illumination",
+    public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES = new HashSet<>(Arrays.asList(THING_TYPE_MOON));
+
+    private final String[] positionalChannelIds = new String[] { "phase#name", "phase#age", "phase#illumination",
             "position#azimuth", "position#elevation", "zodiac#sign" };
-    private MoonCalc moonCalc = new MoonCalc();
+    private final MoonCalc moonCalc = new MoonCalc();
     private Moon moon;
 
+    /** Constructor */
     public MoonHandler(Thing thing) {
         super(thing);
     }
 
     @Override
     public void publishDailyInfo() {
-        moon = moonCalc.getMoonInfo(Calendar.getInstance(), thingConfig.getLatitude(), thingConfig.getLongitude());
+        initializeMoon();
         publishPositionalInfo();
     }
 
     @Override
     public void publishPositionalInfo() {
+        initializeMoon();
         moonCalc.setPositionalInfo(Calendar.getInstance(), thingConfig.getLatitude(), thingConfig.getLongitude(), moon);
         publishPlanet();
     }
@@ -68,8 +72,12 @@ public class MoonHandler extends AstroThingHandler {
     }
 
     @Override
-    protected Class<? extends AbstractDailyJob> getDailyJobClass() {
-        return DailyJobMoon.class;
+    protected Job getDailyJob() {
+        return new DailyJobMoon(thing.getUID().getAsString(), this);
+    }
+    
+    private void initializeMoon() {
+        moon = moonCalc.getMoonInfo(Calendar.getInstance(), thingConfig.getLatitude(), thingConfig.getLongitude());
     }
 
 }
