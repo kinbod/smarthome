@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
@@ -59,7 +60,7 @@ public class ChannelItemProvider implements ItemProvider {
 
     private boolean enabled = true;
     private boolean initialized = false;
-    private long lastUpdate = System.nanoTime();
+    private volatile long lastUpdate = System.nanoTime();
 
     @Override
     public Collection<Item> getAll() {
@@ -146,24 +147,13 @@ public class ChannelItemProvider implements ItemProvider {
         }
 
         if (enabled) {
-            Executors.newSingleThreadExecutor().submit(new Runnable() {
-                @Override
-                public void run() {
-                    // we wait until no further new links or items are announced in order to avoid creation of
-                    // items which then must be removed again immediately.
-                    while (lastUpdate > System.nanoTime() - TimeUnit.SECONDS.toNanos(2)) {
-                        try {
-                            Thread.sleep(100L);
-                        } catch (InterruptedException e) {
-                        }
-                    }
-                    logger.debug("Enabling channel item provider.");
-                    initialized = true;
-                    // simply call getAll() will create the items and notify all registered listeners automatically
-                    getAll();
-                    addRegistryChangeListeners();
-                }
-            });
+            boolean initialDelay = properties == null
+                    || !"false".equalsIgnoreCase((String) properties.get("initialDelay"));
+            if (initialDelay) {
+                delayedInitialize(Executors.newSingleThreadScheduledExecutor());
+            } else {
+                initialize();
+            }
         } else {
             logger.debug("Disabling channel item provider.");
             for (ProviderChangeListener<Item> listener : listeners) {
@@ -173,6 +163,26 @@ public class ChannelItemProvider implements ItemProvider {
             }
             removeRegistryChangeListeners();
         }
+    }
+
+    private void delayedInitialize(ScheduledExecutorService executor) {
+        // we wait until no further new links or items are announced in order to avoid creation of
+        // items which then must be removed again immediately.
+        final long diff = System.nanoTime() - lastUpdate - TimeUnit.SECONDS.toNanos(2);
+        if (diff < 0) {
+            executor.schedule(() -> delayedInitialize(executor), -diff, TimeUnit.NANOSECONDS);
+        } else {
+            executor.shutdown();
+            initialize();
+        }
+    }
+
+    private void initialize() {
+        logger.debug("Enabling channel item provider.");
+        initialized = true;
+        // simply call getAll() will create the items and notify all registered listeners automatically
+        getAll();
+        addRegistryChangeListeners();
     }
 
     protected void deactivate() {

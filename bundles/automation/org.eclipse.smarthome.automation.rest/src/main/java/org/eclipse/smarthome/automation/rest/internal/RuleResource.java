@@ -7,11 +7,15 @@
  */
 package org.eclipse.smarthome.automation.rest.internal;
 
+import static org.eclipse.smarthome.automation.RulePredicates.*;
+
 import java.io.IOException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -21,6 +25,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -85,20 +90,32 @@ public class RuleResource implements RESTResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation(value = "Get all available rules.", response = EnrichedRuleDTO.class, responseContainer = "Collection")
+    @ApiOperation(value = "Get available rules, optionally filtered by tags and/or prefix.", response = EnrichedRuleDTO.class, responseContainer = "Collection")
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "OK", response = EnrichedRuleDTO.class, responseContainer = "Collection") })
-    public Response getAll() {
-        Collection<EnrichedRuleDTO> rules = enrich(ruleRegistry.getAll());
-        return Response.ok(rules).build();
-    }
+    public Response get(@QueryParam("prefix") final String prefix, @QueryParam("tags") final List<String> tags) {
+        // match all
+        Predicate<Rule> p = r -> true;
 
-    private Collection<EnrichedRuleDTO> enrich(Collection<Rule> rules) {
-        Collection<EnrichedRuleDTO> enrichedRules = new ArrayList<EnrichedRuleDTO>(rules.size());
-        for (Rule rule : rules) {
-            enrichedRules.add(EnrichedRuleDTOMapper.map(rule, ruleRegistry));
+        // prefix parameter has been used
+        if (null != prefix) {
+            // works also for null prefix
+            // (empty prefix used if searching for rules without prefix)
+            p = p.and(hasPrefix(prefix));
         }
-        return enrichedRules;
+
+        // tag parameter has been used
+        if (null != tags) {
+            // works also for empty tag list
+            // (empty tags list used if searching for rules without _any_ tags)
+            p = p.and(hasAllTags(tags));
+        }
+
+        final Collection<EnrichedRuleDTO> rules = ruleRegistry.stream().filter(p) // filter according to Predicates
+                .map(rule -> EnrichedRuleDTOMapper.map(rule, ruleRegistry)) // map matching rules
+                .collect(Collectors.toList());
+
+        return Response.ok(rules).build();
     }
 
     @POST

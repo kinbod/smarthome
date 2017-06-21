@@ -47,7 +47,7 @@ public class JavaOSGiTest {
     protected final int DFL_SLEEP_TIME = 50;
 
     private final Map<String, ServiceRegistration<?>> registeredServices = new HashMap<>();
-    BundleContext bundleContext;
+    protected BundleContext bundleContext;
 
     @Before
     public void bindBundleContext() {
@@ -105,6 +105,9 @@ public class JavaOSGiTest {
     protected <T> T getService(Class<T> clazz, Predicate<ServiceReference<T>> filter) {
         final ServiceReference<T> serviceReferences[] = getServices(clazz);
 
+        if (serviceReferences == null) {
+            return null;
+        }
         final List<T> filteredServiceReferences = new ArrayList<>(serviceReferences.length);
         for (final ServiceReference<T> serviceReference : serviceReferences) {
             if (filter.test(serviceReference)) {
