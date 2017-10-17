@@ -42,7 +42,9 @@ import com.google.common.collect.ImmutableList;
 public abstract class AbstractManagedProvider<E extends Identifiable<K>, K, PE> extends AbstractProvider<E>
         implements ManagedProvider<E, K> {
 
-    private Storage<PE> storage;
+    private StorageService storageService;
+    private volatile Storage<PE> storage;
+
     protected final Logger logger = LoggerFactory.getLogger(AbstractManagedProvider.class);
 
     @Override
@@ -120,10 +122,12 @@ public abstract class AbstractManagedProvider<E extends Identifiable<K>, K, PE> 
         String key = getKeyAsString(element);
         if (storage.get(key) != null) {
             PE persistableElement = storage.put(key, toPersistableElement(element));
-            E oldElement = toElement(key, persistableElement);
-            notifyListenersAboutUpdatedElement(oldElement, element);
-            logger.debug("Updated element {} in {}.", key, this.getClass().getSimpleName());
-            return oldElement;
+            if (persistableElement != null) {
+                E oldElement = toElement(key, persistableElement);
+                notifyListenersAboutUpdatedElement(oldElement, element);
+                logger.debug("Updated element {} in {}.", key, this.getClass().getSimpleName());
+                return oldElement;
+            }
         } else {
             logger.warn("Could not update element with key {} in {}, because it does not exists.", key,
                     this.getClass().getSimpleName());
@@ -152,8 +156,18 @@ public abstract class AbstractManagedProvider<E extends Identifiable<K>, K, PE> 
      */
     protected abstract @NonNull String keyToString(@NonNull K key);
 
-    protected void setStorageService(StorageService storageService) {
-        this.storage = storageService.getStorage(getStorageName(), this.getClass().getClassLoader());
+    protected void setStorageService(final StorageService storageService) {
+        if (this.storageService != storageService) {
+            this.storageService = storageService;
+            storage = storageService.getStorage(getStorageName(), this.getClass().getClassLoader());
+        }
+    }
+
+    protected void unsetStorageService(final StorageService storageService) {
+        if (this.storageService == storageService) {
+            this.storageService = null;
+            this.storage = null;
+        }
     }
 
     /**
@@ -174,9 +188,5 @@ public abstract class AbstractManagedProvider<E extends Identifiable<K>, K, PE> 
      * @return persistable element
      */
     protected abstract PE toPersistableElement(E element);
-
-    protected void unsetStorageService(StorageService storageService) {
-        this.storage = null;
-    }
 
 }

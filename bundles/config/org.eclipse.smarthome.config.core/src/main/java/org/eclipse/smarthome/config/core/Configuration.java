@@ -8,6 +8,7 @@
 package org.eclipse.smarthome.config.core;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +67,10 @@ public class Configuration {
 
             List<Field> fields = getAllFields(configurationClass);
             for (Field field : fields) {
+                // Don't try to write to final fields
+                if (Modifier.isFinal(field.getModifiers())) {
+                    continue;
+                }
                 String fieldName = field.getName();
                 String typeName = field.getType().getSimpleName();
                 Object value = properties.get(fieldName);
@@ -107,9 +112,10 @@ public class Configuration {
     private List<Field> getAllFields(Class<?> clazz) {
         List<Field> fields = new ArrayList<Field>();
 
-        while (clazz != null) {
-            fields.addAll(Arrays.asList(clazz.getDeclaredFields()));
-            clazz = clazz.getSuperclass();
+        Class<?> currentClass = clazz;
+        while (currentClass != null) {
+            fields.addAll(Arrays.asList(currentClass.getDeclaredFields()));
+            currentClass = currentClass.getSuperclass();
         }
 
         return fields;

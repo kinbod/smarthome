@@ -10,7 +10,11 @@ package org.eclipse.smarthome.core.thing.link;
 import java.util.Collection;
 
 import org.eclipse.smarthome.core.common.registry.DefaultAbstractManagedProvider;
+import org.eclipse.smarthome.core.storage.StorageService;
 import org.eclipse.smarthome.core.thing.ThingUID;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferencePolicy;
 
 /**
  *
@@ -19,6 +23,7 @@ import org.eclipse.smarthome.core.thing.ThingUID;
  * @author Dennis Nobel - Initial contribution
  *
  */
+@Component(immediate = true, service = { ItemChannelLinkProvider.class, ManagedItemChannelLinkProvider.class })
 public class ManagedItemChannelLinkProvider extends DefaultAbstractManagedProvider<ItemChannelLink, String>
         implements ItemChannelLinkProvider {
 
@@ -39,6 +44,17 @@ public class ManagedItemChannelLinkProvider extends DefaultAbstractManagedProvid
                 this.remove(itemChannelLink.getUID());
             }
         }
+    }
+
+    @Reference(policy = ReferencePolicy.DYNAMIC)
+    @Override
+    protected void setStorageService(StorageService storageService) {
+        super.setStorageService(storageService);
+    }
+
+    @Override
+    protected void unsetStorageService(StorageService storageService) {
+        super.unsetStorageService(storageService);
     }
 
 }

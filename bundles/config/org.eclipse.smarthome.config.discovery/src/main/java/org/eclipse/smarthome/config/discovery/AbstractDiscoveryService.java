@@ -19,9 +19,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.smarthome.config.discovery.internal.DiscoveryResultImpl;
 import org.eclipse.smarthome.core.common.ThreadPoolManager;
+import org.eclipse.smarthome.core.i18n.I18nUtil;
+import org.eclipse.smarthome.core.i18n.LocaleProvider;
+import org.eclipse.smarthome.core.i18n.TranslationProvider;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.ThingUID;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.FrameworkUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +65,9 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
     private long timestampOfLastScan = 0L;
 
     private ScheduledFuture<?> scheduledStop;
+
+    protected TranslationProvider i18nProvider;
+    protected LocaleProvider localeProvider;
 
     /**
      * Creates a new instance of this class with the specified parameters.
@@ -249,6 +258,20 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
      *            Holds the information needed to identify the discovered device.
      */
     protected void thingDiscovered(DiscoveryResult discoveryResult) {
+        if (this.i18nProvider != null && this.localeProvider != null) {
+            Bundle bundle = FrameworkUtil.getBundle(this.getClass());
+
+            String defaultLabel = discoveryResult.getLabel();
+
+            String key = I18nUtil.isConstant(defaultLabel) ? I18nUtil.stripConstant(defaultLabel)
+                    : inferKey(discoveryResult, "label");
+
+            String label = this.i18nProvider.getText(bundle, key, defaultLabel, this.localeProvider.getLocale());
+
+            discoveryResult = new DiscoveryResultImpl(discoveryResult.getThingTypeUID(), discoveryResult.getThingUID(),
+                    discoveryResult.getBridgeUID(), discoveryResult.getProperties(),
+                    discoveryResult.getRepresentationProperty(), label, discoveryResult.getTimeToLive());
+        }
         for (DiscoveryListener discoveryListener : discoveryListeners) {
             try {
                 discoveryListener.thingDiscovered(this, discoveryResult);
@@ -310,12 +333,11 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
      */
     protected void removeOlderResults(long timestamp, Collection<ThingTypeUID> thingTypeUIDs) {
         Collection<ThingUID> removedThings = null;
-        if (thingTypeUIDs == null) {
-            thingTypeUIDs = getSupportedThingTypes();
-        }
+
+        Collection<ThingTypeUID> toBeRemoved = thingTypeUIDs != null ? thingTypeUIDs : getSupportedThingTypes();
         for (DiscoveryListener discoveryListener : discoveryListeners) {
             try {
-                removedThings = discoveryListener.removeOlderResults(this, timestamp, thingTypeUIDs);
+                removedThings = discoveryListener.removeOlderResults(this, timestamp, toBeRemoved);
             } catch (Exception e) {
                 logger.error("An error occurred while calling the discovery listener {}.",
                         discoveryListener.getClass().getName(), e);
@@ -340,7 +362,7 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
      */
     protected void activate(Map<String, Object> configProperties) {
         if (configProperties != null) {
-            Object property = configProperties.get(DiscoveryService.CONFIG_PROPERTY_BACKGROUND_DISCOVERY_ENABLED);
+            Object property = configProperties.get(DiscoveryService.CONFIG_PROPERTY_BACKGROUND_DISCOVERY);
             if (property != null) {
                 this.backgroundDiscoveryEnabled = getAutoDiscoveryEnabled(property);
             }
@@ -364,7 +386,7 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
      */
     protected void modified(Map<String, Object> configProperties) {
         if (configProperties != null) {
-            Object property = configProperties.get(DiscoveryService.CONFIG_PROPERTY_BACKGROUND_DISCOVERY_ENABLED);
+            Object property = configProperties.get(DiscoveryService.CONFIG_PROPERTY_BACKGROUND_DISCOVERY);
             if (property != null) {
                 boolean enabled = getAutoDiscoveryEnabled(property);
 
@@ -431,4 +453,9 @@ public abstract class AbstractDiscoveryService implements DiscoveryService {
             return false;
         }
     }
+
+    private String inferKey(DiscoveryResult discoveryResult, String lastSegment) {
+        return "discovery." + discoveryResult.getThingUID().getAsString().replaceAll(":", ".") + "." + lastSegment;
+    }
+
 }

@@ -45,20 +45,19 @@ public class JavaOSGiTest extends JavaTest {
 
     @Before
     public void bindBundleContext() {
-        bundleContext = getBundleContext();
+        bundleContext = initBundleContext();
         assertThat(bundleContext, is(notNullValue()));
     }
 
     /**
-     * Get the {@link BundleContext}, which is used for registration and unregistration of OSGi services.
+     * Initialise the {@link BundleContext}, which is used for registration and unregistration of OSGi services.
      *
      * <p>
-     * By default it uses the bundle context of the test class itself. This method can be overridden by concrete
-     * implementations to provide another bundle context.
+     * This uses the bundle context of the test class itself.
      *
      * @return bundle context
      */
-    private BundleContext getBundleContext() {
+    private BundleContext initBundleContext() {
         final Bundle bundle = FrameworkUtil.getBundle(this.getClass());
         if (bundle != null) {
             return bundle.getBundleContext();
@@ -295,19 +294,6 @@ public class JavaOSGiTest extends JavaTest {
             @Override
             public Boolean autoUpdate(String itemName) {
                 return false;
-            }
-        });
-    }
-
-    /**
-     * Inject a service to enable the auto-update feature.
-     */
-    protected void enableItemAutoUpdate() {
-        registerService(new AutoUpdateBindingConfigProvider() {
-
-            @Override
-            public Boolean autoUpdate(String itemName) {
-                return true;
             }
         });
     }

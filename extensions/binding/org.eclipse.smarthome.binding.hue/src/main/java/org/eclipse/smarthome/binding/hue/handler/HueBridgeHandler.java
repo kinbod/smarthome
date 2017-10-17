@@ -187,15 +187,17 @@ public class HueBridgeHandler extends ConfigStatusBridgeHandler {
     }
 
     public void updateLightState(FullLight light, StateUpdate stateUpdate) {
-
         if (hueBridge != null) {
             try {
                 hueBridge.setLightState(light, stateUpdate);
             } catch (DeviceOffException e) {
                 updateLightState(light, LightStateConverter.toOnOffLightState(OnOffType.ON));
                 updateLightState(light, stateUpdate);
-            } catch (IOException | ApiException e) {
-                throw new RuntimeException(e);
+            } catch (IOException e) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+            } catch (ApiException e) {
+                // This should not happen - if it does, it is most likely some bug that should be reported.
+                logger.warn("Error while accessing light: {}", e.getMessage(), e);
             } catch (IllegalStateException e) {
                 logger.trace("Error while accessing light: {}", e.getMessage());
             }
@@ -278,6 +280,7 @@ public class HueBridgeHandler extends ConfigStatusBridgeHandler {
                 properties.put(Thing.PROPERTY_SERIAL_NUMBER, config.getMACAddress().replaceAll(":", "").toLowerCase());
                 properties.put(Thing.PROPERTY_FIRMWARE_VERSION, config.getSoftwareVersion());
                 updateProperties(properties);
+                updateThing(thing);
                 propertiesInitializedSuccessfully = true;
             }
         }
@@ -449,19 +452,26 @@ public class HueBridgeHandler extends ConfigStatusBridgeHandler {
     }
 
     /**
-     * Iterate through lightStatusListeners and notify them about a changed ot added light state.
+     * Iterate through lightStatusListeners and notify them about a changed or added light state.
      *
      * @param fullLight
      * @param type Can be "changed" if just a state has changed or "added" if this is a new light on the bridge.
      */
     private void notifyLightStatusListeners(final FullLight fullLight, final String type) {
+        if (lightStatusListeners.isEmpty()) {
+            logger.debug("No light status listeners to notify of light change for light {}", fullLight.getId());
+            return;
+        }
+
         for (LightStatusListener lightStatusListener : lightStatusListeners) {
             try {
                 switch (type) {
                     case LIGHT_STATE_ADDED:
                         lightStatusListener.onLightAdded(hueBridge, fullLight);
+                        logger.debug("Sending lightAdded for light {}", fullLight.getId());
                         break;
                     case LIGHT_STATE_CHANGED:
+                        logger.debug("Sending lightStateChanged for light {}", fullLight.getId());
                         lightStatusListener.onLightStateChanged(hueBridge, fullLight);
                         break;
                     default:
